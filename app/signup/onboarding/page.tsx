@@ -27,7 +27,7 @@ export default function OnboardingPage() {
 
     setSubmitting(true);
     try {
-      const res = await fetch(`${API_URL}/auth/onboarding`, {
+      const res = await fetch(`${API_URL}/api/member/onboarding`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
