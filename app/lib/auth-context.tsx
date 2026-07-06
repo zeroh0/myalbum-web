@@ -8,13 +8,16 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import type { ApiResponse } from "@/app/lib/api";
+
+const ONBOARDING_PATH = "/signup/onboarding";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
 
 export type Member = {
   memberId: number;
-  username: string;
+  username: string | null;
   displayName: string | null;
   profileImageUrl: string | null;
   status: string;
@@ -46,9 +49,19 @@ async function fetchMember(accessToken: string): Promise<Member | null> {
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const pathname = usePathname();
+  const router = useRouter();
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [member, setMember] = useState<Member | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // username을 아직 입력하지 않은 PENDING 회원은 추가입력을 마치기 전까지
+  // 어떤 페이지에 있든 온보딩 페이지로 보낸다.
+  useEffect(() => {
+    if (!loading && member?.status === "PENDING" && pathname !== ONBOARDING_PATH) {
+      router.replace(ONBOARDING_PATH);
+    }
+  }, [loading, member, pathname, router]);
 
   // refreshToken 쿠키(SameSite=Strict, Secure)를 이용해 새로고침 후에도
   // 로그인 상태를 복구한다. localhost는 포트가 달라도 same-site로 취급되어
@@ -102,11 +115,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setMember(null);
   }, [accessToken]);
 
+  // 리다이렉트가 완료되기 전까지 온보딩 대상 페이지의 내용이 잠깐이라도
+  // 보이지 않도록 자식 렌더링을 생략한다.
+  const blockedByOnboarding =
+    !loading && member?.status === "PENDING" && pathname !== ONBOARDING_PATH;
+
   return (
     <AuthContext.Provider
       value={{ accessToken, member, loading, login, logout }}
     >
-      {children}
+      {blockedByOnboarding ? null : children}
     </AuthContext.Provider>
   );
 }
