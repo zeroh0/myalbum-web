@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import AuthCard from "@/app/components/AuthCard";
@@ -15,10 +15,18 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
 
 export default function OnboardingPage() {
   const router = useRouter();
-  const { accessToken, loading: authLoading } = useAuth();
+  const { accessToken, member, loading: authLoading } = useAuth();
   const [username, setUsername] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+
+  // 소셜 로그인은 신규/기존 회원 구분 없이 항상 이 페이지로 리다이렉트되므로,
+  // 이미 온보딩을 마친(ACTIVE) 회원은 사용자명을 다시 입력받지 않고 홈으로 보낸다.
+  useEffect(() => {
+    if (!authLoading && member?.status === "ACTIVE") {
+      router.replace("/");
+    }
+  }, [authLoading, member, router]);
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -73,6 +81,12 @@ export default function OnboardingPage() {
         </p>
       </AuthCard>
     );
+  }
+
+  // ACTIVE 회원은 위 useEffect에서 홈으로 리다이렉트되는 동안 폼이 잠깐
+  // 보이지 않도록 렌더링을 생략한다.
+  if (member?.status === "ACTIVE") {
+    return null;
   }
 
   return (
