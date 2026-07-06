@@ -8,7 +8,7 @@ export default function AuthCard({
 }: {
   title: string;
   children: ReactNode;
-  footer: ReactNode;
+  footer?: ReactNode;
 }) {
   return (
     <div className="flex min-h-screen items-center justify-center bg-zinc-50 px-4 py-12 dark:bg-black">
@@ -25,9 +25,11 @@ export default function AuthCard({
           </h1>
           {children}
         </div>
-        <p className="mt-6 text-center text-sm text-zinc-600 dark:text-zinc-400">
-          {footer}
-        </p>
+        {footer && (
+          <p className="mt-6 text-center text-sm text-zinc-600 dark:text-zinc-400">
+            {footer}
+          </p>
+        )}
       </div>
     </div>
   );

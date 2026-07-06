@@ -54,7 +54,7 @@ export default function SocialLoginButtons() {
       {providers.map((provider) => (
         <a
           key={provider.id}
-          href={`${API_URL}/oauth/${provider.id}`}
+          href={`${API_URL}/oauth2/authorization/${provider.id}`}
           className={`flex h-11 items-center justify-center gap-2 rounded-full text-sm font-medium transition-colors ${provider.className}`}
         >
           {provider.icon}

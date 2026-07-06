@@ -5,10 +5,13 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import AuthCard from "@/app/components/AuthCard";
 import TextField from "@/app/components/TextField";
+import UsernameField, {
+  USERNAME_ERROR,
+  isValidUsername,
+} from "@/app/components/UsernameField";
 import SocialLoginButtons from "@/app/components/SocialLoginButtons";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
-const USERNAME_PATTERN = /^[a-z0-9_-]{3,20}$/;
 
 export default function SignupPage() {
   const router = useRouter();
@@ -27,8 +30,8 @@ export default function SignupPage() {
       setError("비밀번호가 일치하지 않습니다.");
       return;
     }
-    if (!USERNAME_PATTERN.test(username)) {
-      setError("사용자명은 영문 소문자, 숫자, -, _ 로 3~20자여야 합니다.");
+    if (!isValidUsername(username)) {
+      setError(USERNAME_ERROR);
       return;
     }
 
@@ -75,27 +78,7 @@ export default function SignupPage() {
           onChange={(e) => setEmail(e.target.value)}
           placeholder="you@example.com"
         />
-        <TextField
-          id="username"
-          label="사용자명"
-          type="text"
-          required
-          minLength={3}
-          maxLength={20}
-          pattern="[a-z0-9_-]+"
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
-          placeholder="yourname"
-          hint={
-            <>
-              영문 소문자, 숫자, -, _ 만 사용 가능하며 앨범 주소로
-              사용됩니다:{" "}
-              <span className="font-medium text-zinc-700 dark:text-zinc-300">
-                myalbum.com/{username || "yourname"}
-              </span>
-            </>
-          }
-        />
+        <UsernameField value={username} onChange={setUsername} />
         <TextField
           id="password"
           label="비밀번호"
