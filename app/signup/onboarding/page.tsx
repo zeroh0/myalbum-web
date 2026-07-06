@@ -2,16 +2,20 @@
 
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import AuthCard from "@/app/components/AuthCard";
 import UsernameField, {
   USERNAME_ERROR,
   isValidUsername,
 } from "@/app/components/UsernameField";
+import { useAuth } from "@/app/lib/auth-context";
+import type { ApiResponse } from "@/app/lib/api";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
 
 export default function OnboardingPage() {
   const router = useRouter();
+  const { accessToken, loading: authLoading } = useAuth();
   const [username, setUsername] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -24,17 +28,25 @@ export default function OnboardingPage() {
       setError(USERNAME_ERROR);
       return;
     }
+    if (!accessToken) {
+      setError("로그인 정보가 확인되지 않았습니다. 다시 로그인해주세요.");
+      return;
+    }
 
     setSubmitting(true);
     try {
       const res = await fetch(`${API_URL}/api/member/onboarding`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
         credentials: "include",
         body: JSON.stringify({ username }),
       });
-      if (!res.ok) {
-        throw new Error("사용자명 등록에 실패했습니다. 다시 시도해주세요.");
+      const body: ApiResponse<unknown> = await res.json();
+      if (!body.success) {
+        throw new Error(body.message || "사용자명 등록에 실패했습니다. 다시 시도해주세요.");
       }
       router.push("/");
     } catch (err) {
@@ -44,6 +56,23 @@ export default function OnboardingPage() {
     } finally {
       setSubmitting(false);
     }
+  }
+
+  if (!authLoading && !accessToken) {
+    return (
+      <AuthCard title="사용자명 설정">
+        <p className="text-center text-sm text-zinc-600 dark:text-zinc-400">
+          로그인 정보가 확인되지 않았습니다.{" "}
+          <Link
+            href="/login"
+            className="font-medium text-red-600 hover:underline"
+          >
+            다시 로그인
+          </Link>
+          해주세요.
+        </p>
+      </AuthCard>
+    );
   }
 
   return (
@@ -57,7 +86,7 @@ export default function OnboardingPage() {
         {error && <p className="text-sm text-red-600">{error}</p>}
         <button
           type="submit"
-          disabled={submitting}
+          disabled={submitting || authLoading}
           className="mt-2 h-11 rounded-full bg-red-600 text-sm font-semibold text-white transition-colors hover:bg-red-700 disabled:opacity-60"
         >
           {submitting ? "저장 중..." : "계속하기"}

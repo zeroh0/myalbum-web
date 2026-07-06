@@ -10,6 +10,7 @@ import UsernameField, {
   isValidUsername,
 } from "@/app/components/UsernameField";
 import SocialLoginButtons from "@/app/components/SocialLoginButtons";
+import type { ApiResponse } from "@/app/lib/api";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
 
@@ -37,13 +38,19 @@ export default function SignupPage() {
 
     setSubmitting(true);
     try {
-      const res = await fetch(`${API_URL}/auth/signup`, {
+      const res = await fetch(`${API_URL}/api/member/signup`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, username, password }),
+        body: JSON.stringify({
+          email,
+          username,
+          password,
+          passwordConfirm: confirmPassword,
+        }),
       });
-      if (!res.ok) {
-        throw new Error("회원가입에 실패했습니다. 다시 시도해주세요.");
+      const body: ApiResponse<unknown> = await res.json();
+      if (!body.success) {
+        throw new Error(body.message || "회원가입에 실패했습니다. 다시 시도해주세요.");
       }
       router.push("/");
     } catch (err) {

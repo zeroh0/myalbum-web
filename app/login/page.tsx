@@ -6,11 +6,14 @@ import Link from "next/link";
 import AuthCard from "@/app/components/AuthCard";
 import TextField from "@/app/components/TextField";
 import SocialLoginButtons from "@/app/components/SocialLoginButtons";
+import { useAuth, type Member } from "@/app/lib/auth-context";
+import type { ApiResponse } from "@/app/lib/api";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
 
 export default function LoginPage() {
   const router = useRouter();
+  const { login } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -21,14 +24,22 @@ export default function LoginPage() {
     setError("");
     setSubmitting(true);
     try {
-      const res = await fetch(`${API_URL}/auth/login`, {
+      const res = await fetch(`${API_URL}/api/member/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ email, password }),
       });
-      if (!res.ok) {
-        throw new Error("이메일 또는 비밀번호가 올바르지 않습니다.");
+      const body: ApiResponse<{
+        tokenResponse: { accessToken: string };
+        loginMember: Member;
+      }> = await res.json();
+      if (!body.success || !body.data) {
+        throw new Error(
+          body.message || "이메일 또는 비밀번호가 올바르지 않습니다.",
+        );
       }
+      login(body.data.tokenResponse.accessToken, body.data.loginMember);
       router.push("/");
     } catch (err) {
       setError(err instanceof Error ? err.message : "로그인에 실패했습니다.");
