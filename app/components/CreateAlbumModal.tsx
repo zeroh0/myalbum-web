@@ -17,15 +17,50 @@ export default function CreateAlbumModal({
   const { accessToken } = useAuth();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [coverFile, setCoverFile] = useState<File | null>(null);
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
+  const [coverUploadId, setCoverUploadId] = useState<number | null>(null);
+  const [coverUploading, setCoverUploading] = useState(false);
+  const [coverError, setCoverError] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  function handleCoverChange(event: ChangeEvent<HTMLInputElement>) {
+  async function handleCoverChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0] ?? null;
-    setCoverFile(file);
-    setCoverPreview(file ? URL.createObjectURL(file) : null);
+    // 같은 파일을 다시 선택해도 onChange가 발생하도록 초기화
+    event.target.value = "";
+    if (!file) return;
+
+    setCoverError("");
+    setCoverUploadId(null);
+    setCoverPreview(URL.createObjectURL(file));
+
+    if (!accessToken) {
+      setCoverError("로그인 정보가 확인되지 않았습니다. 다시 로그인해주세요.");
+      return;
+    }
+
+    setCoverUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch(`${API_URL}/api/upload`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${accessToken}` },
+        body: formData,
+      });
+      const body: ApiResponse<{ id: number }> = await res.json();
+      if (!body.success || !body.data) {
+        throw new Error(body.message || "이미지 업로드에 실패했습니다.");
+      }
+      setCoverUploadId(body.data.id);
+    } catch (err) {
+      setCoverError(
+        err instanceof Error ? err.message : "이미지 업로드에 실패했습니다.",
+      );
+      setCoverPreview(null);
+    } finally {
+      setCoverUploading(false);
+    }
   }
 
   async function handleSubmit(event: FormEvent) {
@@ -40,25 +75,13 @@ export default function CreateAlbumModal({
       setError("로그인 정보가 확인되지 않았습니다. 다시 로그인해주세요.");
       return;
     }
+    if (coverUploading) {
+      setError("커버 이미지 업로드가 끝날 때까지 기다려주세요.");
+      return;
+    }
 
     setSubmitting(true);
     try {
-      let uploadFileId: number | null = null;
-      if (coverFile) {
-        const formData = new FormData();
-        formData.append("file", coverFile);
-        const uploadRes = await fetch(`${API_URL}/api/upload`, {
-          method: "POST",
-          headers: { Authorization: `Bearer ${accessToken}` },
-          body: formData,
-        });
-        const uploadBody: ApiResponse<{ id: number }> = await uploadRes.json();
-        if (!uploadBody.success || !uploadBody.data) {
-          throw new Error(uploadBody.message || "이미지 업로드에 실패했습니다.");
-        }
-        uploadFileId = uploadBody.data.id;
-      }
-
       const res = await fetch(`${API_URL}/api/album`, {
         method: "POST",
         headers: {
@@ -68,7 +91,7 @@ export default function CreateAlbumModal({
         body: JSON.stringify({
           title,
           description,
-          saveUploadFileRequest: { id: uploadFileId },
+          saveUploadFileRequest: { id: coverUploadId },
         }),
       });
       const body: ApiResponse<{ id: number }> = await res.json();
@@ -96,24 +119,35 @@ export default function CreateAlbumModal({
           앨범 생성
         </h2>
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <label className="mx-auto flex h-28 w-28 cursor-pointer items-center justify-center overflow-hidden rounded-xl border border-dashed border-zinc-300 bg-zinc-50 text-center text-xs text-zinc-400 dark:border-zinc-700 dark:bg-zinc-900">
-            {coverPreview ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={coverPreview}
-                alt="커버 미리보기"
-                className="h-full w-full object-cover"
+          <div className="mx-auto flex flex-col items-center gap-1">
+            <label className="relative flex h-28 w-28 cursor-pointer items-center justify-center overflow-hidden rounded-xl border border-dashed border-zinc-300 bg-zinc-50 text-center text-xs text-zinc-400 dark:border-zinc-700 dark:bg-zinc-900">
+              {coverPreview ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={coverPreview}
+                  alt="커버 미리보기"
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                "커버 이미지\n(선택)"
+              )}
+              {coverUploading && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black/40 text-xs font-medium text-white">
+                  업로드 중...
+                </div>
+              )}
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleCoverChange}
+                disabled={coverUploading}
+                className="hidden"
               />
-            ) : (
-              "커버 이미지\n(선택)"
+            </label>
+            {coverError && (
+              <p className="text-xs text-red-600">{coverError}</p>
             )}
-            <input
-              type="file"
-              accept="image/*"
-              onChange={handleCoverChange}
-              className="hidden"
-            />
-          </label>
+          </div>
 
           <TextField
             id="album-title"
@@ -154,7 +188,7 @@ export default function CreateAlbumModal({
             </button>
             <button
               type="submit"
-              disabled={submitting}
+              disabled={submitting || coverUploading}
               className="h-11 flex-1 rounded-full bg-red-600 text-sm font-semibold text-white transition-colors hover:bg-red-700 disabled:opacity-60"
             >
               {submitting ? "생성 중..." : "생성"}
