@@ -14,3 +14,11 @@ export type AlbumListItem = {
   status: "PUBLIC" | "PRIVATE";
   createdAt: string;
 };
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
+
+// 업로드된 파일은 백엔드의 정적 리소스 핸들러가 /resource/** 경로로
+// 서빙한다 (WebConfig.addResourceHandlers).
+export function buildUploadFileUrl(url: string): string {
+  return `${API_URL}/resource/${url}`;
+}

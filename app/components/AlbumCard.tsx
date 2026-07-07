@@ -1,13 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import type { AlbumListItem } from "@/app/lib/album";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
+import { buildUploadFileUrl, type AlbumListItem } from "@/app/lib/album";
 
 export default function AlbumCard({ album }: { album: AlbumListItem }) {
   const [imgError, setImgError] = useState(false);
-  const coverUrl = album.uploadFile ? `${API_URL}/${album.uploadFile.url}` : null;
+  const coverUrl = album.uploadFile
+    ? buildUploadFileUrl(album.uploadFile.url)
+    : null;
 
   return (
     <div className="group overflow-hidden rounded-2xl border border-zinc-200 bg-white transition-shadow hover:shadow-md dark:border-zinc-800 dark:bg-zinc-950">
