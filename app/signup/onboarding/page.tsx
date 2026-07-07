@@ -15,7 +15,8 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
 
 export default function OnboardingPage() {
   const router = useRouter();
-  const { accessToken, member, loading: authLoading } = useAuth();
+  const { accessToken, member, loading: authLoading, completeOnboarding } =
+    useAuth();
   const [username, setUsername] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -56,6 +57,7 @@ export default function OnboardingPage() {
       if (!body.success) {
         throw new Error(body.message || "사용자명 등록에 실패했습니다. 다시 시도해주세요.");
       }
+      completeOnboarding(username);
       router.push("/");
     } catch (err) {
       setError(

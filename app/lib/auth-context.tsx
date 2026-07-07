@@ -35,6 +35,7 @@ type AuthContextValue = {
   loading: boolean;
   login: (accessToken: string, member: Member) => void;
   logout: () => Promise<void>;
+  completeOnboarding: (username: string) => void;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -104,6 +105,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setMember(loggedInMember);
   }, []);
 
+  // 온보딩 API가 성공한 직후, 서버를 다시 조회하지 않고도 로컬 상태를
+  // 곧바로 ACTIVE로 반영해 전역 PENDING 리다이렉트 가드에 걸리지 않게 한다.
+  const completeOnboarding = useCallback((username: string) => {
+    setMember((prev) => (prev ? { ...prev, username, status: "ACTIVE" } : prev));
+  }, []);
+
   const logout = useCallback(async () => {
     if (accessToken) {
       await fetch(`${API_URL}/api/auth/logout`, {
@@ -122,7 +129,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ accessToken, member, loading, login, logout }}
+      value={{ accessToken, member, loading, login, logout, completeOnboarding }}
     >
       {blockedByOnboarding ? null : children}
     </AuthContext.Provider>
