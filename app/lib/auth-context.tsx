@@ -67,36 +67,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // refreshToken 쿠키(SameSite=Strict, Secure)를 이용해 새로고침 후에도
   // 로그인 상태를 복구한다. localhost는 포트가 달라도 same-site로 취급되어
   // http://localhost:3000 -> http://localhost:9000 요청에도 쿠키가 실린다.
+  //
+  // AbortController로 실제 요청 자체를 취소한다: 개발 모드 StrictMode는 이
+  // effect를 두 번 실행하는데, 취소 없이 fetch만 두 번 날아가면 같은 회원에
+  // 대해 /api/auth/refresh가 짧은 시간에 두 번 호출되어 백엔드에서 토큰
+  // 발급이 겹치는 경합을 유발할 수 있다.
   useEffect(() => {
-    let cancelled = false;
+    const controller = new AbortController();
 
     async function bootstrap() {
       try {
         const res = await fetch(`${API_URL}/api/auth/refresh`, {
           method: "POST",
           credentials: "include",
+          signal: controller.signal,
         });
         if (!res.ok) throw new Error("no session");
         const body: ApiResponse<TokenResponse> = await res.json();
         if (!body.data) throw new Error("no token");
         const memberData = await fetchMember(body.data.accessToken);
-        if (!cancelled) {
-          setAccessToken(body.data.accessToken);
-          setMember(memberData);
-        }
+        setAccessToken(body.data.accessToken);
+        setMember(memberData);
+        setLoading(false);
       } catch {
-        if (!cancelled) {
-          setAccessToken(null);
-          setMember(null);
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
+        if (controller.signal.aborted) return;
+        setAccessToken(null);
+        setMember(null);
+        setLoading(false);
       }
     }
 
     bootstrap();
     return () => {
-      cancelled = true;
+      controller.abort();
     };
   }, []);
 
