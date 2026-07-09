@@ -1,0 +1,20 @@
+import type { UploadFile } from "@/app/lib/album";
+
+export type Photo = {
+  id: number;
+  title: string | null;
+  description: string | null;
+  displayOrder: number;
+  thumbnailUploadFile: UploadFile;
+  uploadFile: UploadFile;
+  createdAt: string;
+};
+
+export type AlbumPhotoList = {
+  albumId: number;
+  title: string;
+  description: string | null;
+  status: "PUBLIC" | "PRIVATE";
+  owner: boolean;
+  photos: Photo[];
+};

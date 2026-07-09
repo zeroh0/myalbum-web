@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import Link from "next/link";
 import SiteHeader from "@/app/components/SiteHeader";
 import AlbumCard from "@/app/components/AlbumCard";
 import CreateAlbumModal from "@/app/components/CreateAlbumModal";
@@ -86,7 +87,9 @@ export default function AlbumGalleryPage() {
         ) : (
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
             {albums.map((album) => (
-              <AlbumCard key={album.id} album={album} />
+              <Link key={album.id} href={`/album/${username}/${album.id}`}>
+                <AlbumCard album={album} />
+              </Link>
             ))}
           </div>
         )}
