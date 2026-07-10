@@ -6,7 +6,7 @@ export type Photo = {
   description: string | null;
   displayOrder: number;
   thumbnailUploadFile: UploadFile;
-  uploadFile: UploadFile;
+  originUploadFile: UploadFile;
   createdAt: string;
 };
 

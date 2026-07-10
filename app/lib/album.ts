@@ -4,6 +4,12 @@ export type UploadFile = {
   originFileName: string;
   width: number | null;
   height: number | null;
+  cameraModel: string | null;
+  lensModel: string | null;
+  iso: number | null;
+  aperture: string | null;
+  shutterSpeed: string | null;
+  takenAt: string | null;
 };
 
 export type AlbumListItem = {

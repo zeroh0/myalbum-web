@@ -10,10 +10,11 @@ import {
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import SiteHeader from "@/app/components/SiteHeader";
+import PhotoDetailModal from "@/app/components/PhotoDetailModal";
 import { useAuth } from "@/app/lib/auth-context";
 import { buildUploadFileUrl } from "@/app/lib/album";
 import type { ApiResponse } from "@/app/lib/api";
-import type { AlbumPhotoList } from "@/app/lib/photo";
+import type { AlbumPhotoList, Photo } from "@/app/lib/photo";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
 
@@ -57,6 +58,8 @@ export default function AlbumDetailPage() {
   const [dragOverPhotoIndex, setDragOverPhotoIndex] = useState<number | null>(
     null,
   );
+
+  const [selectedPhoto, setSelectedPhoto] = useState<Photo | null>(null);
 
   const isOwner = data?.owner ?? false;
 
@@ -391,7 +394,8 @@ export default function AlbumDetailPage() {
                       setDraggingPhotoIndex(null);
                       setDragOverPhotoIndex(null);
                     }}
-                    className={`group relative aspect-square overflow-hidden rounded-xl bg-zinc-100 transition-all dark:bg-zinc-900 ${
+                    onClick={() => setSelectedPhoto(photo)}
+                    className={`group relative aspect-square cursor-pointer overflow-hidden rounded-xl bg-zinc-100 transition-all dark:bg-zinc-900 ${
                       isOwner ? "cursor-move" : ""
                     } ${draggingPhotoIndex === index ? "opacity-40" : ""} ${
                       dragOverPhotoIndex === index &&
@@ -409,7 +413,10 @@ export default function AlbumDetailPage() {
                     {isOwner && (
                       <button
                         type="button"
-                        onClick={() => handleDeletePhoto(photo.id)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeletePhoto(photo.id);
+                        }}
                         className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-white opacity-0 transition-opacity group-hover:opacity-100"
                         aria-label="사진 삭제"
                       >
@@ -431,6 +438,15 @@ export default function AlbumDetailPage() {
           </>
         )}
       </main>
+
+      {selectedPhoto && data && (
+        <PhotoDetailModal
+          photo={selectedPhoto}
+          albumTitle={data.title}
+          albumHref={`/album/${username}/${data.albumId}`}
+          onClose={() => setSelectedPhoto(null)}
+        />
+      )}
     </div>
   );
 }
