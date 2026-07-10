@@ -15,6 +15,11 @@ import type { ApiResponse } from "@/app/lib/api";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
 
+const PASSWORD_PATTERN =
+  /^(?=.*[A-Za-z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>/?])[A-Za-z\d!@#$%^&*()_+\-=\[\]{};':"\\|,.<>/?]{8,24}$/;
+const PASSWORD_HINT =
+  "비밀번호는 8~24자이며, 최소 하나의 문자, 숫자 및 특수문자를 포함해야 합니다.";
+
 export default function SignupPage() {
   const router = useRouter();
   const { withLoading } = useGlobalLoading();
@@ -29,6 +34,10 @@ export default function SignupPage() {
     event.preventDefault();
     setError("");
 
+    if (!PASSWORD_PATTERN.test(password)) {
+      setError(PASSWORD_HINT);
+      return;
+    }
     if (password !== confirmPassword) {
       setError("비밀번호가 일치하지 않습니다.");
       return;
@@ -98,9 +107,12 @@ export default function SignupPage() {
           type="password"
           required
           minLength={8}
+          maxLength={24}
+          pattern={PASSWORD_PATTERN.source}
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          placeholder="8자 이상"
+          placeholder="8~24자"
+          hint={PASSWORD_HINT}
         />
         <TextField
           id="confirmPassword"
@@ -108,9 +120,10 @@ export default function SignupPage() {
           type="password"
           required
           minLength={8}
+          maxLength={24}
           value={confirmPassword}
           onChange={(e) => setConfirmPassword(e.target.value)}
-          placeholder="8자 이상"
+          placeholder="8~24자"
         />
         {error && <p className="text-sm text-red-600">{error}</p>}
         <button
