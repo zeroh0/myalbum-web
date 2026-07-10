@@ -11,8 +11,8 @@ export default function PhotoDetailModal({
   onClose,
 }: {
   photo: Photo;
-  albumTitle: string;
-  albumHref: string;
+  albumTitle?: string;
+  albumHref?: string;
   onClose: () => void;
 }) {
   const uploadedAt = new Date(photo.createdAt).toLocaleString("ko-KR");
@@ -41,13 +41,19 @@ export default function PhotoDetailModal({
 
         <div className="flex w-full flex-col gap-3 p-6 sm:w-96">
           <div className="flex items-start justify-between gap-2">
-            <Link
-              href={albumHref}
-              onClick={onClose}
-              className="text-lg font-semibold text-zinc-900 hover:underline dark:text-zinc-50"
-            >
-              {albumTitle}
-            </Link>
+            {albumHref && albumTitle ? (
+              <Link
+                href={albumHref}
+                onClick={onClose}
+                className="text-lg font-semibold text-zinc-900 hover:underline dark:text-zinc-50"
+              >
+                {albumTitle}
+              </Link>
+            ) : (
+              <span className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+                {photo.title ?? "사진"}
+              </span>
+            )}
             <button
               type="button"
               onClick={onClose}
