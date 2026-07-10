@@ -9,6 +9,7 @@ import UsernameField, {
   isValidUsername,
 } from "@/app/components/UsernameField";
 import { useAuth } from "@/app/lib/auth-context";
+import { useGlobalLoading } from "@/app/lib/loading-context";
 import type { ApiResponse } from "@/app/lib/api";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
@@ -17,6 +18,7 @@ export default function OnboardingPage() {
   const router = useRouter();
   const { accessToken, member, loading: authLoading, completeOnboarding } =
     useAuth();
+  const { withLoading } = useGlobalLoading();
   const [username, setUsername] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -44,21 +46,25 @@ export default function OnboardingPage() {
 
     setSubmitting(true);
     try {
-      const res = await fetch(`${API_URL}/api/member/onboarding`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${accessToken}`,
-        },
-        credentials: "include",
-        body: JSON.stringify({ username }),
+      await withLoading(async () => {
+        const res = await fetch(`${API_URL}/api/member/onboarding`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${accessToken}`,
+          },
+          credentials: "include",
+          body: JSON.stringify({ username }),
+        });
+        const body: ApiResponse<unknown> = await res.json();
+        if (!body.success) {
+          throw new Error(
+            body.message || "사용자명 등록에 실패했습니다. 다시 시도해주세요.",
+          );
+        }
+        completeOnboarding(username);
+        router.push("/");
       });
-      const body: ApiResponse<unknown> = await res.json();
-      if (!body.success) {
-        throw new Error(body.message || "사용자명 등록에 실패했습니다. 다시 시도해주세요.");
-      }
-      completeOnboarding(username);
-      router.push("/");
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "사용자명 등록에 실패했습니다.",

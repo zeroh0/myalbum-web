@@ -12,6 +12,7 @@ import Link from "next/link";
 import SiteHeader from "@/app/components/SiteHeader";
 import PhotoDetailModal from "@/app/components/PhotoDetailModal";
 import { useAuth } from "@/app/lib/auth-context";
+import { useGlobalLoading } from "@/app/lib/loading-context";
 import { buildUploadFileUrl } from "@/app/lib/album";
 import type { ApiResponse } from "@/app/lib/api";
 import type { AlbumPhotoList, Photo } from "@/app/lib/photo";
@@ -35,6 +36,7 @@ export default function AlbumDetailPage() {
     albumId: string;
   }>();
   const { accessToken, loading: authLoading } = useAuth();
+  const { withLoading } = useGlobalLoading();
 
   const [data, setData] = useState<AlbumPhotoList | null>(null);
   const [loading, setLoading] = useState(true);
@@ -146,40 +148,43 @@ export default function AlbumDetailPage() {
     setUploading(true);
     setUploadError("");
     try {
-      const formData = new FormData();
-      pendingFiles.forEach((p) => formData.append("files", p.file));
+      await withLoading(async () => {
+        const formData = new FormData();
+        pendingFiles.forEach((p) => formData.append("files", p.file));
 
-      const uploadRes = await fetch(`${API_URL}/api/upload/images`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${accessToken}` },
-        body: formData,
+        const uploadRes = await fetch(`${API_URL}/api/upload/images`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${accessToken}` },
+          body: formData,
+        });
+        const uploadBody: ApiResponse<UploadedImage[]> =
+          await uploadRes.json();
+        if (!uploadBody.success || !uploadBody.data) {
+          throw new Error(uploadBody.message || "이미지 업로드에 실패했습니다.");
+        }
+
+        const uploadPhotoList = uploadBody.data.map((item) => ({
+          thumbnailImageId: item.thumbnailImageFile.id,
+          imageId: item.originalImageFile.id,
+        }));
+
+        const saveRes = await fetch(`${API_URL}/api/photos/${albumId}`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({ uploadPhotoList }),
+        });
+        const saveBody: ApiResponse<unknown> = await saveRes.json();
+        if (!saveBody.success) {
+          throw new Error(saveBody.message || "사진 저장에 실패했습니다.");
+        }
+
+        pendingFiles.forEach((p) => URL.revokeObjectURL(p.previewUrl));
+        setPendingFiles([]);
+        await loadData();
       });
-      const uploadBody: ApiResponse<UploadedImage[]> = await uploadRes.json();
-      if (!uploadBody.success || !uploadBody.data) {
-        throw new Error(uploadBody.message || "이미지 업로드에 실패했습니다.");
-      }
-
-      const uploadPhotoList = uploadBody.data.map((item) => ({
-        thumbnailImageId: item.thumbnailImageFile.id,
-        imageId: item.originalImageFile.id,
-      }));
-
-      const saveRes = await fetch(`${API_URL}/api/photos/${albumId}`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${accessToken}`,
-        },
-        body: JSON.stringify({ uploadPhotoList }),
-      });
-      const saveBody: ApiResponse<unknown> = await saveRes.json();
-      if (!saveBody.success) {
-        throw new Error(saveBody.message || "사진 저장에 실패했습니다.");
-      }
-
-      pendingFiles.forEach((p) => URL.revokeObjectURL(p.previewUrl));
-      setPendingFiles([]);
-      await loadData();
     } catch (err) {
       setUploadError(
         err instanceof Error ? err.message : "업로드에 실패했습니다.",
@@ -196,11 +201,13 @@ export default function AlbumDetailPage() {
     const prevPhotos = data.photos;
     setData({ ...data, photos: data.photos.filter((p) => p.id !== photoId) });
     try {
-      const res = await fetch(`${API_URL}/api/photos/${photoId}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${accessToken}` },
+      await withLoading(async () => {
+        const res = await fetch(`${API_URL}/api/photos/${photoId}`, {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${accessToken}` },
+        });
+        if (!res.ok) throw new Error();
       });
-      if (!res.ok) throw new Error();
     } catch {
       setData((prev) => (prev ? { ...prev, photos: prevPhotos } : prev));
     }

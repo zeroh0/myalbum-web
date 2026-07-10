@@ -10,12 +10,14 @@ import UsernameField, {
   isValidUsername,
 } from "@/app/components/UsernameField";
 import SocialLoginButtons from "@/app/components/SocialLoginButtons";
+import { useGlobalLoading } from "@/app/lib/loading-context";
 import type { ApiResponse } from "@/app/lib/api";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
 
 export default function SignupPage() {
   const router = useRouter();
+  const { withLoading } = useGlobalLoading();
   const [email, setEmail] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -38,21 +40,25 @@ export default function SignupPage() {
 
     setSubmitting(true);
     try {
-      const res = await fetch(`${API_URL}/api/member/signup`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email,
-          username,
-          password,
-          passwordConfirm: confirmPassword,
-        }),
+      await withLoading(async () => {
+        const res = await fetch(`${API_URL}/api/member/signup`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email,
+            username,
+            password,
+            passwordConfirm: confirmPassword,
+          }),
+        });
+        const body: ApiResponse<unknown> = await res.json();
+        if (!body.success) {
+          throw new Error(
+            body.message || "회원가입에 실패했습니다. 다시 시도해주세요.",
+          );
+        }
+        router.push("/");
       });
-      const body: ApiResponse<unknown> = await res.json();
-      if (!body.success) {
-        throw new Error(body.message || "회원가입에 실패했습니다. 다시 시도해주세요.");
-      }
-      router.push("/");
     } catch (err) {
       setError(err instanceof Error ? err.message : "회원가입에 실패했습니다.");
     } finally {

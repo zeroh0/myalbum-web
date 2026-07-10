@@ -3,6 +3,7 @@
 import { useState, type ChangeEvent, type FormEvent } from "react";
 import TextField from "@/app/components/TextField";
 import { useAuth } from "@/app/lib/auth-context";
+import { useGlobalLoading } from "@/app/lib/loading-context";
 import type { ApiResponse } from "@/app/lib/api";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
@@ -15,6 +16,7 @@ export default function CreateAlbumModal({
   onCreated: () => void;
 }) {
   const { accessToken } = useAuth();
+  const { withLoading } = useGlobalLoading();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
@@ -41,18 +43,20 @@ export default function CreateAlbumModal({
 
     setCoverUploading(true);
     try {
-      const formData = new FormData();
-      formData.append("file", file);
-      const res = await fetch(`${API_URL}/api/upload`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${accessToken}` },
-        body: formData,
+      await withLoading(async () => {
+        const formData = new FormData();
+        formData.append("file", file);
+        const res = await fetch(`${API_URL}/api/upload`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${accessToken}` },
+          body: formData,
+        });
+        const body: ApiResponse<{ id: number }> = await res.json();
+        if (!body.success || !body.data) {
+          throw new Error(body.message || "이미지 업로드에 실패했습니다.");
+        }
+        setCoverUploadId(body.data.id);
       });
-      const body: ApiResponse<{ id: number }> = await res.json();
-      if (!body.success || !body.data) {
-        throw new Error(body.message || "이미지 업로드에 실패했습니다.");
-      }
-      setCoverUploadId(body.data.id);
     } catch (err) {
       setCoverError(
         err instanceof Error ? err.message : "이미지 업로드에 실패했습니다.",
@@ -82,23 +86,25 @@ export default function CreateAlbumModal({
 
     setSubmitting(true);
     try {
-      const res = await fetch(`${API_URL}/api/album`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${accessToken}`,
-        },
-        body: JSON.stringify({
-          title,
-          description,
-          saveUploadFileRequest: { id: coverUploadId },
-        }),
+      await withLoading(async () => {
+        const res = await fetch(`${API_URL}/api/album`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({
+            title,
+            description,
+            saveUploadFileRequest: { id: coverUploadId },
+          }),
+        });
+        const body: ApiResponse<{ id: number }> = await res.json();
+        if (!body.success) {
+          throw new Error(body.message || "앨범 생성에 실패했습니다.");
+        }
+        onCreated();
       });
-      const body: ApiResponse<{ id: number }> = await res.json();
-      if (!body.success) {
-        throw new Error(body.message || "앨범 생성에 실패했습니다.");
-      }
-      onCreated();
     } catch (err) {
       setError(err instanceof Error ? err.message : "앨범 생성에 실패했습니다.");
     } finally {
