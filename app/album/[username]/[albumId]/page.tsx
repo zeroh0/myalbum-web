@@ -13,6 +13,7 @@ import SiteHeader from "@/app/components/SiteHeader";
 import PhotoDetailModal from "@/app/components/PhotoDetailModal";
 import { useAuth } from "@/app/lib/auth-context";
 import { useGlobalLoading } from "@/app/lib/loading-context";
+import { useDragReorder } from "@/app/lib/use-drag-reorder";
 import { buildUploadFileUrl } from "@/app/lib/album";
 import type { ApiResponse } from "@/app/lib/api";
 import type { AlbumPhotoList, Photo } from "@/app/lib/photo";
@@ -30,6 +31,19 @@ type UploadedImage = {
   originalImageFile: { id: number };
 };
 
+function GripIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="currentColor">
+      <circle cx="9" cy="6" r="1.5" />
+      <circle cx="15" cy="6" r="1.5" />
+      <circle cx="9" cy="12" r="1.5" />
+      <circle cx="15" cy="12" r="1.5" />
+      <circle cx="9" cy="18" r="1.5" />
+      <circle cx="15" cy="18" r="1.5" />
+    </svg>
+  );
+}
+
 export default function AlbumDetailPage() {
   const { username, albumId } = useParams<{
     username: string;
@@ -46,20 +60,6 @@ export default function AlbumDetailPage() {
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
   const [dragOverDrop, setDragOverDrop] = useState(false);
-
-  const [draggingPendingIndex, setDraggingPendingIndex] = useState<
-    number | null
-  >(null);
-  const [dragOverPendingIndex, setDragOverPendingIndex] = useState<
-    number | null
-  >(null);
-
-  const [draggingPhotoIndex, setDraggingPhotoIndex] = useState<number | null>(
-    null,
-  );
-  const [dragOverPhotoIndex, setDragOverPhotoIndex] = useState<number | null>(
-    null,
-  );
 
   const [selectedPhoto, setSelectedPhoto] = useState<Photo | null>(null);
 
@@ -129,18 +129,16 @@ export default function AlbumDetailPage() {
     });
   }
 
-  function handlePendingDrop(index: number) {
-    const from = draggingPendingIndex;
-    setDraggingPendingIndex(null);
-    setDragOverPendingIndex(null);
-    if (from === null || from === index) return;
-    setPendingFiles((prev) => {
-      const next = [...prev];
-      const [moved] = next.splice(from, 1);
-      next.splice(index, 0, moved);
-      return next;
-    });
-  }
+  const reorderPending = useDragReorder(
+    useCallback((from: number, to: number) => {
+      setPendingFiles((prev) => {
+        const next = [...prev];
+        const [moved] = next.splice(from, 1);
+        next.splice(to, 0, moved);
+        return next;
+      });
+    }, []),
+  );
 
   async function handleUploadSubmit() {
     if (pendingFiles.length === 0 || !accessToken) return;
@@ -213,33 +211,35 @@ export default function AlbumDetailPage() {
     }
   }
 
-  async function handlePhotoDrop(index: number) {
-    const from = draggingPhotoIndex;
-    setDraggingPhotoIndex(null);
-    setDragOverPhotoIndex(null);
-    if (from === null || from === index || !data || !accessToken) return;
+  const handlePhotoReorder = useCallback(
+    async (from: number, to: number) => {
+      if (!data || !accessToken) return;
 
-    const reordered = [...data.photos];
-    const [moved] = reordered.splice(from, 1);
-    reordered.splice(index, 0, moved);
-    setData({ ...data, photos: reordered });
+      const reordered = [...data.photos];
+      const [moved] = reordered.splice(from, 1);
+      reordered.splice(to, 0, moved);
+      setData({ ...data, photos: reordered });
 
-    try {
-      await fetch(`${API_URL}/api/photos/reorder`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${accessToken}`,
-        },
-        body: JSON.stringify({
-          albumId: Number(albumId),
-          photoIds: reordered.map((p) => p.id),
-        }),
-      });
-    } catch {
-      loadData();
-    }
-  }
+      try {
+        await fetch(`${API_URL}/api/photos/reorder`, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({
+            albumId: Number(albumId),
+            photoIds: reordered.map((p) => p.id),
+          }),
+        });
+      } catch {
+        loadData();
+      }
+    },
+    [data, accessToken, albumId, loadData],
+  );
+
+  const reorderPhotos = useDragReorder(handlePhotoReorder);
 
   return (
     <div className="min-h-screen bg-white dark:bg-black">
@@ -303,29 +303,14 @@ export default function AlbumDetailPage() {
                       {pendingFiles.map((p, index) => (
                         <div
                           key={p.key}
-                          draggable
-                          onDragStart={() => setDraggingPendingIndex(index)}
-                          onDragOver={(e) => {
-                            e.preventDefault();
-                            if (dragOverPendingIndex !== index) {
-                              setDragOverPendingIndex(index);
-                            }
-                          }}
-                          onDrop={(e) => {
-                            e.preventDefault();
-                            handlePendingDrop(index);
-                          }}
-                          onDragEnd={() => {
-                            setDraggingPendingIndex(null);
-                            setDragOverPendingIndex(null);
-                          }}
-                          className={`group relative h-20 w-20 cursor-move overflow-hidden rounded-lg border transition-all ${
-                            draggingPendingIndex === index
+                          ref={reorderPending.setItemRef(index)}
+                          className={`group relative h-20 w-20 select-none overflow-hidden rounded-lg border transition-all ${
+                            reorderPending.draggingIndex === index
                               ? "opacity-40"
                               : ""
                           } ${
-                            dragOverPendingIndex === index &&
-                            draggingPendingIndex !== index
+                            reorderPending.overIndex === index &&
+                            reorderPending.draggingIndex !== index
                               ? "border-red-500 ring-2 ring-red-500 ring-offset-1"
                               : "border-zinc-200 dark:border-zinc-700"
                           }`}
@@ -341,8 +326,20 @@ export default function AlbumDetailPage() {
                           </span>
                           <button
                             type="button"
+                            onPointerDown={reorderPending.onHandlePointerDown(
+                              index,
+                            )}
+                            onClick={(e) => e.stopPropagation()}
+                            style={{ touchAction: "none" }}
+                            className="absolute bottom-1 left-1 flex h-5 w-5 cursor-move items-center justify-center rounded-full bg-black/60 text-white opacity-100 transition-opacity [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100"
+                            aria-label="순서 변경"
+                          >
+                            <GripIcon />
+                          </button>
+                          <button
+                            type="button"
                             onClick={() => removePendingFile(p.key)}
-                            className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-xs text-white opacity-0 transition-opacity group-hover:opacity-100"
+                            className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-xs text-white opacity-100 transition-opacity [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100"
                             aria-label="첨부 취소"
                           >
                             ×
@@ -384,29 +381,18 @@ export default function AlbumDetailPage() {
                 {data.photos.map((photo, index) => (
                   <div
                     key={photo.id}
-                    draggable={isOwner}
-                    onDragStart={() => setDraggingPhotoIndex(index)}
-                    onDragOver={(e) => {
-                      if (!isOwner) return;
-                      e.preventDefault();
-                      if (dragOverPhotoIndex !== index) {
-                        setDragOverPhotoIndex(index);
-                      }
+                    ref={isOwner ? reorderPhotos.setItemRef(index) : undefined}
+                    onClick={() => {
+                      if (reorderPhotos.consumeSuppressedClick()) return;
+                      setSelectedPhoto(photo);
                     }}
-                    onDrop={(e) => {
-                      e.preventDefault();
-                      handlePhotoDrop(index);
-                    }}
-                    onDragEnd={() => {
-                      setDraggingPhotoIndex(null);
-                      setDragOverPhotoIndex(null);
-                    }}
-                    onClick={() => setSelectedPhoto(photo)}
-                    className={`group relative aspect-square cursor-pointer overflow-hidden rounded-xl bg-zinc-100 transition-all dark:bg-zinc-900 ${
-                      isOwner ? "cursor-move" : ""
-                    } ${draggingPhotoIndex === index ? "opacity-40" : ""} ${
-                      dragOverPhotoIndex === index &&
-                      draggingPhotoIndex !== index
+                    className={`group relative aspect-square cursor-pointer select-none overflow-hidden rounded-xl bg-zinc-100 transition-all dark:bg-zinc-900 ${
+                      reorderPhotos.draggingIndex === index
+                        ? "opacity-40"
+                        : ""
+                    } ${
+                      reorderPhotos.overIndex === index &&
+                      reorderPhotos.draggingIndex !== index
                         ? "ring-4 ring-red-500 ring-offset-2 ring-offset-white dark:ring-offset-black"
                         : ""
                     }`}
@@ -418,25 +404,42 @@ export default function AlbumDetailPage() {
                       className="h-full w-full object-cover"
                     />
                     {isOwner && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeletePhoto(photo.id);
-                        }}
-                        className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-white opacity-0 transition-opacity group-hover:opacity-100"
-                        aria-label="사진 삭제"
-                      >
-                        <svg
-                          viewBox="0 0 24 24"
-                          className="h-4 w-4"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth={2}
+                      <>
+                        <button
+                          type="button"
+                          onPointerDown={reorderPhotos.onHandlePointerDown(
+                            index,
+                          )}
+                          onClick={(e) => e.stopPropagation()}
+                          style={{ touchAction: "none" }}
+                          className="absolute left-2 top-2 flex h-7 w-7 cursor-move items-center justify-center rounded-full bg-black/60 text-white opacity-100 transition-opacity [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100"
+                          aria-label="순서 변경"
                         >
-                          <path d="M6 6l12 12M18 6L6 18" strokeLinecap="round" />
-                        </svg>
-                      </button>
+                          <GripIcon />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeletePhoto(photo.id);
+                          }}
+                          className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-white opacity-100 transition-opacity [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100"
+                          aria-label="사진 삭제"
+                        >
+                          <svg
+                            viewBox="0 0 24 24"
+                            className="h-4 w-4"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth={2}
+                          >
+                            <path
+                              d="M6 6l12 12M18 6L6 18"
+                              strokeLinecap="round"
+                            />
+                          </svg>
+                        </button>
+                      </>
                     )}
                   </div>
                 ))}
