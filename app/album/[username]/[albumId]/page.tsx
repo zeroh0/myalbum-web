@@ -14,6 +14,7 @@ import PhotoDetailModal from "@/app/components/PhotoDetailModal";
 import { useAuth } from "@/app/lib/auth-context";
 import { useGlobalLoading } from "@/app/lib/loading-context";
 import { useDragReorder } from "@/app/lib/use-drag-reorder";
+import { createImagePreviewUrl, isHeicFile } from "@/app/lib/heic";
 import { buildUploadFileUrl } from "@/app/lib/album";
 import type { ApiResponse } from "@/app/lib/api";
 import type { AlbumPhotoList, Photo } from "@/app/lib/photo";
@@ -23,7 +24,9 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
 type PendingFile = {
   key: string;
   file: File;
-  previewUrl: string;
+  // HEIC/HEIF는 미리보기용 변환에 시간이 걸리므로, 변환이 끝나기 전까지는
+  // null로 두고 로딩 표시를 보여준다.
+  previewUrl: string | null;
 };
 
 type UploadedImage = {
@@ -95,15 +98,25 @@ export default function AlbumDetailPage() {
   }, [authLoading, loadData]);
 
   function addFiles(files: FileList | File[]) {
-    const imageFiles = Array.from(files).filter((file) =>
-      file.type.startsWith("image/"),
+    const imageFiles = Array.from(files).filter(
+      (file) => file.type.startsWith("image/") || isHeicFile(file),
     );
-    const newPending = imageFiles.map((file) => ({
+    const placeholders: PendingFile[] = imageFiles.map((file) => ({
       key: `${file.name}-${file.size}-${Math.random().toString(36).slice(2)}`,
       file,
-      previewUrl: URL.createObjectURL(file),
+      previewUrl: null,
     }));
-    setPendingFiles((prev) => [...prev, ...newPending]);
+    setPendingFiles((prev) => [...prev, ...placeholders]);
+
+    for (const placeholder of placeholders) {
+      createImagePreviewUrl(placeholder.file).then((previewUrl) => {
+        setPendingFiles((prev) =>
+          prev.map((p) =>
+            p.key === placeholder.key ? { ...p, previewUrl } : p,
+          ),
+        );
+      });
+    }
   }
 
   function handleDrop(event: DragEvent<HTMLDivElement>) {
@@ -124,7 +137,7 @@ export default function AlbumDetailPage() {
   function removePendingFile(key: string) {
     setPendingFiles((prev) => {
       const target = prev.find((p) => p.key === key);
-      if (target) URL.revokeObjectURL(target.previewUrl);
+      if (target?.previewUrl) URL.revokeObjectURL(target.previewUrl);
       return prev.filter((p) => p.key !== key);
     });
   }
@@ -140,8 +153,10 @@ export default function AlbumDetailPage() {
     }, []),
   );
 
+  const hasConvertingFiles = pendingFiles.some((p) => p.previewUrl === null);
+
   async function handleUploadSubmit() {
-    if (pendingFiles.length === 0 || !accessToken) return;
+    if (pendingFiles.length === 0 || !accessToken || hasConvertingFiles) return;
 
     setUploading(true);
     setUploadError("");
@@ -179,7 +194,9 @@ export default function AlbumDetailPage() {
           throw new Error(saveBody.message || "사진 저장에 실패했습니다.");
         }
 
-        pendingFiles.forEach((p) => URL.revokeObjectURL(p.previewUrl));
+        pendingFiles.forEach((p) => {
+          if (p.previewUrl) URL.revokeObjectURL(p.previewUrl);
+        });
         setPendingFiles([]);
         await loadData();
       });
@@ -290,7 +307,7 @@ export default function AlbumDetailPage() {
                   하세요
                   <input
                     type="file"
-                    accept="image/*"
+                    accept="image/*,.heic,.heif"
                     multiple
                     className="hidden"
                     onChange={handleFileInputChange}
@@ -315,12 +332,18 @@ export default function AlbumDetailPage() {
                               : "border-zinc-200 dark:border-zinc-700"
                           }`}
                         >
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
-                            src={p.previewUrl}
-                            alt=""
-                            className="h-full w-full object-cover"
-                          />
+                          {p.previewUrl ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={p.previewUrl}
+                              alt=""
+                              className="h-full w-full object-cover"
+                            />
+                          ) : (
+                            <div className="flex h-full w-full items-center justify-center bg-zinc-100 dark:bg-zinc-800">
+                              <div className="h-5 w-5 animate-spin rounded-full border-2 border-zinc-300 border-t-zinc-500 dark:border-zinc-600 dark:border-t-zinc-300" />
+                            </div>
+                          )}
                           <span className="absolute left-1 top-1 rounded-full bg-black/60 px-1.5 text-[10px] font-semibold text-white">
                             {index + 1}
                           </span>
@@ -358,12 +381,14 @@ export default function AlbumDetailPage() {
                     <button
                       type="button"
                       onClick={handleUploadSubmit}
-                      disabled={uploading}
+                      disabled={uploading || hasConvertingFiles}
                       className="mt-3 rounded-full bg-red-600 px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-700 disabled:opacity-60"
                     >
                       {uploading
                         ? "업로드 중..."
-                        : `${pendingFiles.length}장 업로드`}
+                        : hasConvertingFiles
+                          ? "첨부 처리 중..."
+                          : `${pendingFiles.length}장 업로드`}
                     </button>
                   </div>
                 )}
