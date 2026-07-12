@@ -1,5 +1,11 @@
 import type { UploadFile } from "@/app/lib/album";
 
+export type AlbumOwner = {
+  username: string;
+  albumId: string;
+  albumName: string;
+};
+
 export type Photo = {
   id: number;
   title: string | null;
@@ -8,6 +14,7 @@ export type Photo = {
   thumbnailUploadFile: UploadFile;
   originUploadFile: UploadFile;
   createdAt: string;
+  albumOwner: AlbumOwner;
 };
 
 export type AlbumPhotoList = {

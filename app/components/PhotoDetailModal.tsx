@@ -6,13 +6,9 @@ import type { Photo } from "@/app/lib/photo";
 
 export default function PhotoDetailModal({
   photo,
-  albumTitle,
-  albumHref,
   onClose,
 }: {
   photo: Photo;
-  albumTitle?: string;
-  albumHref?: string;
   onClose: () => void;
 }) {
   const uploadedAt = new Date(photo.createdAt).toLocaleString("ko-KR");
@@ -20,6 +16,7 @@ export default function PhotoDetailModal({
   const takenAt = exif.takenAt
     ? new Date(exif.takenAt).toLocaleDateString("ko-KR")
     : null;
+  const { albumOwner } = photo;
 
   return (
     <div
@@ -41,19 +38,22 @@ export default function PhotoDetailModal({
 
         <div className="flex w-full flex-col gap-3 p-6 sm:w-96">
           <div className="flex items-start justify-between gap-2">
-            {albumHref && albumTitle ? (
+            <div className="flex flex-col gap-1">
               <Link
-                href={albumHref}
+                href={`/album/${albumOwner.username}`}
                 onClick={onClose}
-                className="text-lg font-semibold text-zinc-900 hover:underline dark:text-zinc-50"
+                className="py-0.5 text-sm text-zinc-500 hover:underline dark:text-zinc-400"
               >
-                {albumTitle}
+                {albumOwner.username}
               </Link>
-            ) : (
-              <span className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
-                {photo.title ?? "사진"}
-              </span>
-            )}
+              <Link
+                href={`/album/${albumOwner.username}/${albumOwner.albumId}`}
+                onClick={onClose}
+                className="py-0.5 text-lg font-semibold text-zinc-900 hover:underline dark:text-zinc-50"
+              >
+                {albumOwner.albumName}
+              </Link>
+            </div>
             <button
               type="button"
               onClick={onClose}
@@ -79,12 +79,6 @@ export default function PhotoDetailModal({
           )}
 
           <dl className="mt-2 flex flex-col gap-2 text-sm">
-            <div className="flex justify-between gap-2">
-              <dt className="text-zinc-500 dark:text-zinc-400">파일명</dt>
-              <dd className="truncate text-right text-zinc-900 dark:text-zinc-50">
-                {photo.originUploadFile.originFileName}
-              </dd>
-            </div>
             {photo.originUploadFile.width && photo.originUploadFile.height && (
               <div className="flex justify-between gap-2">
                 <dt className="text-zinc-500 dark:text-zinc-400">크기</dt>

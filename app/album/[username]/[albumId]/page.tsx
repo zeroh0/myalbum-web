@@ -483,8 +483,6 @@ export default function AlbumDetailPage() {
       {selectedPhoto && data && (
         <PhotoDetailModal
           photo={selectedPhoto}
-          albumTitle={data.title}
-          albumHref={`/album/${username}/${data.albumId}`}
           onClose={() => setSelectedPhoto(null)}
         />
       )}
