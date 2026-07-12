@@ -4,6 +4,7 @@ import { useState, type ChangeEvent, type FormEvent } from "react";
 import TextField from "@/app/components/TextField";
 import { useAuth } from "@/app/lib/auth-context";
 import { useGlobalLoading } from "@/app/lib/loading-context";
+import { createImagePreviewUrl, isHeicFile } from "@/app/lib/heic";
 import type { ApiResponse } from "@/app/lib/api";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
@@ -21,6 +22,7 @@ export default function CreateAlbumModal({
   const [description, setDescription] = useState("");
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
   const [coverUploadId, setCoverUploadId] = useState<number | null>(null);
+  const [coverConverting, setCoverConverting] = useState(false);
   const [coverUploading, setCoverUploading] = useState(false);
   const [coverError, setCoverError] = useState("");
   const [error, setError] = useState("");
@@ -34,7 +36,16 @@ export default function CreateAlbumModal({
 
     setCoverError("");
     setCoverUploadId(null);
-    setCoverPreview(URL.createObjectURL(file));
+
+    if (!file.type.startsWith("image/") && !isHeicFile(file)) {
+      setCoverError("이미지 파일만 업로드할 수 있습니다.");
+      return;
+    }
+
+    setCoverConverting(true);
+    const previewUrl = await createImagePreviewUrl(file);
+    setCoverConverting(false);
+    setCoverPreview(previewUrl);
 
     if (!accessToken) {
       setCoverError("로그인 정보가 확인되지 않았습니다. 다시 로그인해주세요.");
@@ -79,8 +90,8 @@ export default function CreateAlbumModal({
       setError("로그인 정보가 확인되지 않았습니다. 다시 로그인해주세요.");
       return;
     }
-    if (coverUploading) {
-      setError("커버 이미지 업로드가 끝날 때까지 기다려주세요.");
+    if (coverConverting || coverUploading) {
+      setError("커버 이미지 처리가 끝날 때까지 기다려주세요.");
       return;
     }
 
@@ -137,16 +148,16 @@ export default function CreateAlbumModal({
               ) : (
                 "커버 이미지\n(선택)"
               )}
-              {coverUploading && (
+              {(coverConverting || coverUploading) && (
                 <div className="absolute inset-0 flex items-center justify-center bg-black/40 text-xs font-medium text-white">
-                  업로드 중...
+                  {coverConverting ? "첨부 처리 중..." : "업로드 중..."}
                 </div>
               )}
               <input
                 type="file"
-                accept="image/*"
+                accept="image/*,.heic,.heif"
                 onChange={handleCoverChange}
-                disabled={coverUploading}
+                disabled={coverConverting || coverUploading}
                 className="hidden"
               />
             </label>
@@ -194,7 +205,7 @@ export default function CreateAlbumModal({
             </button>
             <button
               type="submit"
-              disabled={submitting || coverUploading}
+              disabled={submitting || coverConverting || coverUploading}
               className="h-11 flex-1 rounded-full bg-red-600 text-sm font-semibold text-white transition-colors hover:bg-red-700 disabled:opacity-60"
             >
               {submitting ? "생성 중..." : "생성"}

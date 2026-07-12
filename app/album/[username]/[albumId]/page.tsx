@@ -98,8 +98,14 @@ export default function AlbumDetailPage() {
   }, [authLoading, loadData]);
 
   function addFiles(files: FileList | File[]) {
-    const imageFiles = Array.from(files).filter(
+    const allFiles = Array.from(files);
+    const imageFiles = allFiles.filter(
       (file) => file.type.startsWith("image/") || isHeicFile(file),
+    );
+    setUploadError(
+      imageFiles.length < allFiles.length
+        ? "이미지 파일만 첨부할 수 있습니다."
+        : "",
     );
     const placeholders: PendingFile[] = imageFiles.map((file) => ({
       key: `${file.name}-${file.size}-${Math.random().toString(36).slice(2)}`,
