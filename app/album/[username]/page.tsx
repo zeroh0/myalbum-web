@@ -14,7 +14,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
 
 export default function AlbumGalleryPage() {
   const { username } = useParams<{ username: string }>();
-  const { accessToken, member, loading: authLoading } = useAuth();
+  const { member, loading: authLoading, authFetch } = useAuth();
 
   const [albums, setAlbums] = useState<AlbumListItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -27,11 +27,7 @@ export default function AlbumGalleryPage() {
     setLoading(true);
     setNotFound(false);
     try {
-      const res = await fetch(`${API_URL}/api/album/list/${username}`, {
-        headers: accessToken
-          ? { Authorization: `Bearer ${accessToken}` }
-          : undefined,
-      });
+      const res = await authFetch(`${API_URL}/api/album/list/${username}`);
       const body: ApiResponse<AlbumListItem[]> = await res.json();
       if (!body.success || !body.data) {
         setNotFound(true);
@@ -45,7 +41,7 @@ export default function AlbumGalleryPage() {
     } finally {
       setLoading(false);
     }
-  }, [username, accessToken]);
+  }, [username, authFetch]);
 
   useEffect(() => {
     if (authLoading) return;

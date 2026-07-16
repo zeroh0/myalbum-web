@@ -36,6 +36,9 @@ type AuthContextValue = {
   login: (accessToken: string, member: Member) => void;
   logout: () => Promise<void>;
   completeOnboarding: (username: string) => void;
+  // 인증이 필요한 요청에 사용한다. 401 응답을 받으면 refreshToken 쿠키로
+  // accessToken을 재발급받아 요청을 한 번 더 재시도한다.
+  authFetch: (input: string, init?: RequestInit) => Promise<Response>;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -108,6 +111,47 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setMember(loggedInMember);
   }, []);
 
+  // refreshToken 쿠키로 새 accessToken을 발급받는다. 실패하면 null을 반환하고
+  // 로그인 상태를 정리한다.
+  const refreshAccessToken = useCallback(async (): Promise<string | null> => {
+    try {
+      const res = await fetch(`${API_URL}/api/auth/refresh`, {
+        method: "POST",
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("no session");
+      const body: ApiResponse<TokenResponse> = await res.json();
+      if (!body.data) throw new Error("no token");
+      setAccessToken(body.data.accessToken);
+      return body.data.accessToken;
+    } catch {
+      setAccessToken(null);
+      setMember(null);
+      return null;
+    }
+  }, []);
+
+  // 401을 받으면 accessToken을 재발급받아 요청을 한 번 더 재시도한다.
+  const authFetch = useCallback(
+    async (input: string, init: RequestInit = {}): Promise<Response> => {
+      const withAuthHeader = (token: string | null): RequestInit => ({
+        ...init,
+        headers: {
+          ...init.headers,
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+
+      const res = await fetch(input, withAuthHeader(accessToken));
+      if (res.status !== 401) return res;
+
+      const newToken = await refreshAccessToken();
+      if (!newToken) return res;
+      return fetch(input, withAuthHeader(newToken));
+    },
+    [accessToken, refreshAccessToken],
+  );
+
   // 온보딩 API가 성공한 직후, 서버를 다시 조회하지 않고도 로컬 상태를
   // 곧바로 ACTIVE로 반영해 전역 PENDING 리다이렉트 가드에 걸리지 않게 한다.
   const completeOnboarding = useCallback((username: string) => {
@@ -132,7 +176,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ accessToken, member, loading, login, logout, completeOnboarding }}
+      value={{
+        accessToken,
+        member,
+        loading,
+        login,
+        logout,
+        completeOnboarding,
+        authFetch,
+      }}
     >
       {blockedByOnboarding ? null : children}
     </AuthContext.Provider>

@@ -52,7 +52,7 @@ export default function AlbumDetailPage() {
     username: string;
     albumId: string;
   }>();
-  const { accessToken, loading: authLoading } = useAuth();
+  const { accessToken, loading: authLoading, authFetch } = useAuth();
   const { withLoading } = useGlobalLoading();
 
   const [data, setData] = useState<AlbumPhotoList | null>(null);
@@ -72,11 +72,7 @@ export default function AlbumDetailPage() {
     setLoading(true);
     setNotFound(false);
     try {
-      const res = await fetch(`${API_URL}/api/photos/${albumId}`, {
-        headers: accessToken
-          ? { Authorization: `Bearer ${accessToken}` }
-          : undefined,
-      });
+      const res = await authFetch(`${API_URL}/api/photos/${albumId}`);
       const body: ApiResponse<AlbumPhotoList> = await res.json();
       if (!body.success || !body.data) {
         setNotFound(true);
@@ -90,7 +86,7 @@ export default function AlbumDetailPage() {
     } finally {
       setLoading(false);
     }
-  }, [albumId, accessToken]);
+  }, [albumId, authFetch]);
 
   useEffect(() => {
     if (authLoading) return;
@@ -171,9 +167,8 @@ export default function AlbumDetailPage() {
         const formData = new FormData();
         pendingFiles.forEach((p) => formData.append("files", p.file));
 
-        const uploadRes = await fetch(`${API_URL}/api/upload/images`, {
+        const uploadRes = await authFetch(`${API_URL}/api/upload/images`, {
           method: "POST",
-          headers: { Authorization: `Bearer ${accessToken}` },
           body: formData,
         });
         const uploadBody: ApiResponse<UploadedImage[]> =
@@ -187,12 +182,9 @@ export default function AlbumDetailPage() {
           imageId: item.originalImageFile.id,
         }));
 
-        const saveRes = await fetch(`${API_URL}/api/photos/${albumId}`, {
+        const saveRes = await authFetch(`${API_URL}/api/photos/${albumId}`, {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${accessToken}`,
-          },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ uploadPhotoList }),
         });
         const saveBody: ApiResponse<unknown> = await saveRes.json();
@@ -223,9 +215,8 @@ export default function AlbumDetailPage() {
     setData({ ...data, photos: data.photos.filter((p) => p.id !== photoId) });
     try {
       await withLoading(async () => {
-        const res = await fetch(`${API_URL}/api/photos/${photoId}`, {
+        const res = await authFetch(`${API_URL}/api/photos/${photoId}`, {
           method: "DELETE",
-          headers: { Authorization: `Bearer ${accessToken}` },
         });
         if (!res.ok) throw new Error();
       });
@@ -244,12 +235,9 @@ export default function AlbumDetailPage() {
       setData({ ...data, photos: reordered });
 
       try {
-        await fetch(`${API_URL}/api/photos/reorder`, {
+        await authFetch(`${API_URL}/api/photos/reorder`, {
           method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${accessToken}`,
-          },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             albumId: Number(albumId),
             photoIds: reordered.map((p) => p.id),
@@ -259,7 +247,7 @@ export default function AlbumDetailPage() {
         loadData();
       }
     },
-    [data, accessToken, albumId, loadData],
+    [data, accessToken, authFetch, albumId, loadData],
   );
 
   const reorderPhotos = useDragReorder(handlePhotoReorder);

@@ -16,8 +16,13 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
 
 export default function OnboardingPage() {
   const router = useRouter();
-  const { accessToken, member, loading: authLoading, completeOnboarding } =
-    useAuth();
+  const {
+    accessToken,
+    member,
+    loading: authLoading,
+    completeOnboarding,
+    authFetch,
+  } = useAuth();
   const { withLoading } = useGlobalLoading();
   const [username, setUsername] = useState("");
   const [error, setError] = useState("");
@@ -47,12 +52,9 @@ export default function OnboardingPage() {
     setSubmitting(true);
     try {
       await withLoading(async () => {
-        const res = await fetch(`${API_URL}/api/member/onboarding`, {
+        const res = await authFetch(`${API_URL}/api/member/onboarding`, {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${accessToken}`,
-          },
+          headers: { "Content-Type": "application/json" },
           credentials: "include",
           body: JSON.stringify({ username }),
         });

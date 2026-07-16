@@ -16,7 +16,7 @@ export default function CreateAlbumModal({
   onClose: () => void;
   onCreated: () => void;
 }) {
-  const { accessToken } = useAuth();
+  const { accessToken, authFetch } = useAuth();
   const { withLoading } = useGlobalLoading();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -57,9 +57,8 @@ export default function CreateAlbumModal({
       await withLoading(async () => {
         const formData = new FormData();
         formData.append("file", file);
-        const res = await fetch(`${API_URL}/api/upload`, {
+        const res = await authFetch(`${API_URL}/api/upload`, {
           method: "POST",
-          headers: { Authorization: `Bearer ${accessToken}` },
           body: formData,
         });
         const body: ApiResponse<{ id: number }> = await res.json();
@@ -98,12 +97,9 @@ export default function CreateAlbumModal({
     setSubmitting(true);
     try {
       await withLoading(async () => {
-        const res = await fetch(`${API_URL}/api/album`, {
+        const res = await authFetch(`${API_URL}/api/album`, {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${accessToken}`,
-          },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             title,
             description,
