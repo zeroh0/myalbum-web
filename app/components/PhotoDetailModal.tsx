@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect } from "react";
 import { buildUploadFileUrl } from "@/app/lib/album";
 import type { Photo } from "@/app/lib/photo";
 
@@ -17,6 +18,14 @@ export default function PhotoDetailModal({
     ? new Date(exif.takenAt).toLocaleDateString("ko-KR")
     : null;
   const { albumOwner } = photo;
+
+  useEffect(() => {
+    const original = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = original;
+    };
+  }, []);
 
   return (
     <div
@@ -36,7 +45,7 @@ export default function PhotoDetailModal({
           />
         </div>
 
-        <div className="flex w-full flex-col gap-3 p-6 sm:w-96">
+        <div className="flex w-full min-h-0 flex-col gap-3 overflow-y-auto overscroll-contain p-6 sm:w-96">
           <div className="flex items-start justify-between gap-2">
             <div className="flex flex-col gap-1">
               <Link
